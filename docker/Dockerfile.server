@@ -1,0 +1,67 @@
+# Backend-only image (server + static frontend) with Node 20 LTS, multi-stage, minimal OS surface
+
+FROM node:20-bookworm-slim AS base
+
+WORKDIR /app
+
+# ------------------------------
+# Build frontend
+# ------------------------------
+FROM node:20-bookworm-slim AS frontend-build
+WORKDIR /app/frontend
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+COPY ./frontend/package.json ./frontend/yarn.lock* ./
+RUN yarn install --network-timeout 100000 && yarn cache clean
+COPY ./frontend .
+RUN yarn build \
+    && mkdir -p /tmp/frontend-dist \
+    && cp -r dist /tmp/frontend-dist
+
+# ------------------------------
+# Install server deps (production)
+# ------------------------------
+FROM node:20-bookworm-slim AS server-build
+WORKDIR /app/server
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+COPY ./server/package.json ./server/yarn.lock* ./
+RUN yarn install --production --network-timeout 100000 && yarn cache clean
+COPY ./server .
+
+# ------------------------------
+# Runtime image (server only)
+# ------------------------------
+FROM base AS runtime
+
+# App directory
+WORKDIR /app/server
+
+# Copy server production deps and source
+COPY --from=server-build /app/server/node_modules ./node_modules
+COPY --from=server-build /app/server .
+
+# Copy prebuilt frontend into server/public
+COPY --from=frontend-build /tmp/frontend-dist/dist ./public
+
+# Copy docker helper scripts and default env
+COPY ./docker/docker-entrypoint-server.sh /usr/local/bin/
+COPY ./docker/.env.example /app/server/.env
+
+RUN chmod +x /usr/local/bin/docker-entrypoint-server.sh
+
+# Ensure node can write to app directories (Prisma client, SQLite, logs, etc.)
+RUN chown -R node:node /app/server
+
+# Environment
+ENV NODE_ENV=production \
+    ANYTHING_LLM_RUNTIME=docker \
+    DEPLOYMENT_VERSION=1.9.0
+
+HEALTHCHECK --interval=1m --timeout=10s --start-period=1m \
+    CMD node -e "fetch('http://localhost:3001/api/ping').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))" || exit 1
+
+EXPOSE 3001
+
+# Use the node user provided by the base image
+USER node
+
+ENTRYPOINT ["/bin/bash", "/usr/local/bin/docker-entrypoint-server.sh"]

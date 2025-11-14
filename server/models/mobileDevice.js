@@ -1,6 +1,22 @@
 const prisma = require("../utils/prisma");
 const { v4: uuidv4 } = require("uuid");
-const ip = require("ip");
+const os = require("os");
+
+function getLocalAddress() {
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const iface of ifaces[name] || []) {
+        if (iface && iface.family === "IPv4" && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+  } catch (e) {
+    // fallthrough
+  }
+  return "127.0.0.1";
+}
 
 /**
  * @typedef {Object} TemporaryMobileDeviceRequest
@@ -100,7 +116,7 @@ const MobileDevice = {
     let baseUrl = "/api/mobile";
     if (process.env.NODE_ENV === "production") baseUrl = "/api/mobile";
     else
-      baseUrl = `http://${ip.address()}:${process.env.SERVER_PORT || 3001}/api/mobile`;
+      baseUrl = `http://${getLocalAddress()}:${process.env.SERVER_PORT || 3001}/api/mobile`;
 
     const tempToken = this.registerTempToken(user);
     baseUrl = `${baseUrl}?t=${tempToken}`;
