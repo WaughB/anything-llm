@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Backend-only entrypoint (no collector)
 
@@ -20,15 +20,18 @@ fi
 
 cd /app/server || exit 1
 
-# Generate Prisma client and run migrations if Prisma is present
+# Run migrations if Prisma is present (client was generated at build time)
 if [ -f "./prisma/schema.prisma" ]; then
-  # Ensure SQLite directory exists
+  # Ensure SQLite directory exists for prisma sqlite url (../storage/anythingllm.db => /app/storage)
+  mkdir -p /app/storage
+  # Also create legacy/server storage path used by app code
   mkdir -p /app/server/storage
   # Also ensure STORAGE_DIR exists if provided (used by uploads/assets)
   if [ -n "$STORAGE_DIR" ]; then
     mkdir -p "$STORAGE_DIR"
   fi
-  npx prisma generate --schema=./prisma/schema.prisma || exit 1
+  # Loosen perms to handle bind mounts from Windows hosts
+  chmod -R 0777 /app/storage /app/server/storage "$STORAGE_DIR" 2>/dev/null || true
   npx prisma migrate deploy --schema=./prisma/schema.prisma || exit 1
 fi
 

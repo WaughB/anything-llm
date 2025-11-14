@@ -8,6 +8,7 @@ WORKDIR /app
 # Build frontend
 # ------------------------------
 FROM node:20-bookworm-slim AS frontend-build
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/frontend
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate
 COPY ./frontend/package.json ./frontend/yarn.lock* ./
@@ -21,16 +22,21 @@ RUN yarn build \
 # Install server deps (production)
 # ------------------------------
 FROM node:20-bookworm-slim AS server-build
+# Prisma needs OpenSSL at generate time on Debian 12 (OpenSSL 3)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/server
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate
 COPY ./server/package.json ./server/yarn.lock* ./
 RUN yarn install --production --network-timeout 100000 && yarn cache clean
 COPY ./server .
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # ------------------------------
 # Runtime image (server only)
 # ------------------------------
 FROM base AS runtime
+# Runtime requirements: Prisma engines depend on libssl3 (OpenSSL 3)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # App directory
 WORKDIR /app/server
@@ -49,7 +55,7 @@ COPY ./docker/.env.example /app/server/.env
 RUN chmod +x /usr/local/bin/docker-entrypoint-server.sh
 
 # Ensure node can write to app directories (Prisma client, SQLite, logs, etc.)
-RUN chown -R node:node /app/server
+RUN chown -R node:node /app
 
 # Environment
 ENV NODE_ENV=production \
@@ -64,4 +70,4 @@ EXPOSE 3001
 # Use the node user provided by the base image
 USER node
 
-ENTRYPOINT ["/bin/bash", "/usr/local/bin/docker-entrypoint-server.sh"]
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/docker-entrypoint-server.sh"]
