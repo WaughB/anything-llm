@@ -33,6 +33,6 @@
   "private": false,
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "jest": "^29.7.0"
+    "jest": "^30.2.0"
   }
 }
