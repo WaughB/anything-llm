@@ -32,7 +32,7 @@
     "@langchain/textsplitters": "0.0.0",
     "@mintplex-labs/bree": "^9.2.5",
     "@mintplex-labs/express-ws": "^5.0.7",
-    "@modelcontextprotocol/sdk": "^1.11.0",
+    "@modelcontextprotocol/sdk": "^1.24.0",
     "@pinecone-database/pinecone": "^2.0.1",
     "@prisma/client": "5.3.1",
     "@qdrant/js-client-rest": "^1.9.0",
@@ -87,8 +87,9 @@
     "form-data": "^4.0.4",
     "body-parser": "1.20.3",
     "path-to-regexp": "0.1.12",
-    "tar-fs": "3.1.1",
-    "expr-eval": "jorenbroekema/expr-eval#1d71bb2ca8f98df8de00e9cc4de8fdd468a7ad43"
+    "tar-fs": "2.1.4",
+    "expr-eval": "jorenbroekema/expr-eval#1d71bb2ca8f98df8de00e9cc4de8fdd468a7ad43",
+    "jws": "^3.2.3"
   },
   "devDependencies": {
     "@inquirer/prompts": "^4.3.1",

@@ -146,6 +146,7 @@ FROM build AS backend-build
 COPY --chown=anythingllm:anythingllm ./server /app/server/
 WORKDIR /app/server
 RUN yarn install --production --network-timeout 100000 && yarn cache clean
+RUN npx prisma generate --schema=./prisma/schema.prisma
 WORKDIR /app
 
 # Install collector dependencies
@@ -170,6 +171,7 @@ USER anythingllm
 ENV NODE_ENV=production
 ENV ANYTHING_LLM_RUNTIME=docker
 ENV DEPLOYMENT_VERSION=1.9.0
+ENV DISABLE_TELEMETRY="true"
 
 # Setup the healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=1m \

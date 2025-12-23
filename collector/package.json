@@ -18,7 +18,7 @@
     "@langchain/community": "^0.2.23",
     "@xenova/transformers": "^2.14.0",
     "bcrypt": "^5.1.0",
-    "body-parser": "^1.20.2",
+    "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "epub2": "^3.0.2",
@@ -46,6 +46,13 @@
     "wavefile": "^11.0.0",
     "winston": "^3.13.0",
     "youtubei.js": "^9.1.0"
+  },
+  "resolutions": {
+    "form-data": "^4.0.4",
+    "ws": "^8.17.1",
+    "body-parser": "1.20.3",
+    "path-to-regexp": "0.1.12",
+    "tar-fs": "3.1.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22",
