@@ -1,13 +1,13 @@
 # Backend-only image (server + static frontend) with Node 20 LTS, multi-stage, minimal OS surface
 
-FROM node:20-bookworm-slim AS base
+FROM node:25-bookworm-slim AS base
 
 WORKDIR /app
 
 # ------------------------------
 # Build frontend
 # ------------------------------
-FROM node:20-bookworm-slim AS frontend-build
+FROM node:25-bookworm-slim AS frontend-build
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/frontend
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate
@@ -21,7 +21,7 @@ RUN yarn build \
 # ------------------------------
 # Install server deps (production)
 # ------------------------------
-FROM node:20-bookworm-slim AS server-build
+FROM node:25-bookworm-slim AS server-build
 # Prisma needs OpenSSL at generate time on Debian 12 (OpenSSL 3)
 RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/server
