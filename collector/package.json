@@ -28,7 +28,7 @@
     "ignore": "^5.3.0",
     "js-tiktoken": "^1.0.8",
     "langchain": "0.1.36",
-    "mammoth": "^1.6.0",
+    "mammoth": "^1.11.0",
     "mbox-parser": "^1.0.1",
     "mime": "^3.0.0",
     "moment": "^2.29.4",
