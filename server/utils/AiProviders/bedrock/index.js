@@ -1,5 +1,4 @@
 const {
-  BedrockRuntimeClient,
   ConverseCommand,
   ConverseStreamCommand,
 } = require("@aws-sdk/client-bedrock-runtime");
@@ -15,9 +14,11 @@ const { v4: uuidv4 } = require("uuid");
 const {
   DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_CONTEXT_WINDOW_TOKENS,
-  SUPPORTED_CONNECTION_METHODS,
   getImageFormatFromMime,
   base64ToUint8Array,
+  createBedrockCredentials,
+  createBedrockRuntimeClient,
+  getBedrockAuthMethod,
 } = require("./utils");
 
 class AWSBedrockLLM {
@@ -42,7 +43,7 @@ class AWSBedrockLLM {
    */
   constructor(embedder = null, modelPreference = null) {
     const requiredEnvVars = [
-      ...(this.authMethod !== "iam_role"
+      ...(!["iam_role", "apiKey"].includes(this.authMethod)
         ? [
             // required for iam and sessionToken
             "AWS_BEDROCK_LLM_ACCESS_KEY_ID",
@@ -53,6 +54,12 @@ class AWSBedrockLLM {
         ? [
             // required for sessionToken
             "AWS_BEDROCK_LLM_SESSION_TOKEN",
+          ]
+        : []),
+      ...(this.authMethod === "apiKey"
+        ? [
+            // required for bedrock api key
+            "AWS_BEDROCK_LLM_API_KEY",
           ]
         : []),
       "AWS_BEDROCK_LLM_REGION",
@@ -75,10 +82,10 @@ class AWSBedrockLLM {
       user: Math.floor(contextWindowLimit * 0.7),
     };
 
-    this.bedrockClient = new BedrockRuntimeClient({
-      region: process.env.AWS_BEDROCK_LLM_REGION,
-      credentials: this.credentials,
-    });
+    this.bedrockClient = createBedrockRuntimeClient(
+      this.authMethod,
+      this.credentials
+    );
 
     this.embedder = embedder ?? new NativeEmbedder();
     this.defaultTemp = 0.7;
@@ -92,26 +99,7 @@ class AWSBedrockLLM {
    * @returns {object} The credentials object.
    */
   get credentials() {
-    switch (this.authMethod) {
-      case "iam": // explicit credentials
-        return {
-          accessKeyId: process.env.AWS_BEDROCK_LLM_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_BEDROCK_LLM_ACCESS_KEY,
-        };
-      case "sessionToken": // Session token is used for temporary credentials
-        return {
-          accessKeyId: process.env.AWS_BEDROCK_LLM_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_BEDROCK_LLM_ACCESS_KEY,
-          sessionToken: process.env.AWS_BEDROCK_LLM_SESSION_TOKEN,
-        };
-      // IAM role is used for long-term credentials implied by system process
-      // is filled by the AWS SDK automatically if we pass in no credentials
-      // returning undefined will allow this to happen
-      case "iam_role":
-        return undefined;
-      default:
-        return undefined;
-    }
+    return createBedrockCredentials(this.authMethod);
   }
 
   /**
@@ -120,8 +108,7 @@ class AWSBedrockLLM {
    * @returns {"iam" | "iam_role" | "sessionToken"} The authentication method.
    */
   get authMethod() {
-    const method = process.env.AWS_BEDROCK_LLM_CONNECTION_METHOD || "iam";
-    return SUPPORTED_CONNECTION_METHODS.includes(method) ? method : "iam";
+    return getBedrockAuthMethod();
   }
 
   /**
@@ -287,7 +274,7 @@ class AWSBedrockLLM {
   #generateContent({ userPrompt = "", attachments = [] }) {
     const content = [];
     // Add text block if prompt is not empty
-    if (!!userPrompt?.trim()?.length) content.push({ text: userPrompt });
+    if (userPrompt?.trim()?.length) content.push({ text: userPrompt });
 
     // Validate attachments and add valid attachments to content
     const validAttachments = this.#validateAttachments(attachments);
@@ -384,7 +371,7 @@ class AWSBedrockLLM {
     if (reasoningBlock) {
       const reasoningText =
         reasoningBlock.reasoningContent.reasoningText.text.trim();
-      if (!!reasoningText?.length)
+      if (reasoningText?.length)
         textResponse = `<think>${reasoningText}</think>${textResponse}`;
     }
     return textResponse;
@@ -427,18 +414,12 @@ class AWSBedrockLLM {
             `Bedrock Converse API Error (getChatCompletion): ${e.message}`,
             e
           );
-          if (
-            e.name === "ValidationException" &&
-            e.message.includes("maximum tokens")
-          ) {
-            throw new Error(
-              `AWSBedrock::getChatCompletion failed. Model ${this.model} rejected maxTokens value of ${maxTokensToSend}. Check model documentation for its maximum output token limit and set AWS_BEDROCK_LLM_MAX_OUTPUT_TOKENS if needed. Original error: ${e.message}`
-            );
-          }
-          throw new Error(`AWSBedrock::getChatCompletion failed. ${e.message}`);
-        }),
-      messages,
-      false
+          AWSBedrockLLM.errorToHumanReadable(e, {
+            model: this.model,
+            maxTokens: maxTokensToSend,
+            method: "getChatCompletion",
+          });
+        })
     );
 
     const response = result.output;
@@ -463,6 +444,8 @@ class AWSBedrockLLM {
         total_tokens: response?.usage?.totalTokens ?? 0,
         outputTps: outputTps,
         duration: result.duration,
+        model: this.model,
+        timestamp: new Date(),
       },
     };
   }
@@ -502,11 +485,12 @@ class AWSBedrockLLM {
       );
 
       // If successful, wrap the stream with performance monitoring
-      const measuredStreamRequest = await LLMPerformanceMonitor.measureStream(
-        stream,
+      const measuredStreamRequest = await LLMPerformanceMonitor.measureStream({
+        func: stream,
         messages,
-        false // Indicate it's not a function call measurement
-      );
+        runPromptTokenCalculation: false,
+        modelTag: this.model,
+      });
       return measuredStreamRequest;
     } catch (e) {
       // Catch errors during the initial .send() call (e.g., validation errors)
@@ -514,18 +498,11 @@ class AWSBedrockLLM {
         `Bedrock Converse API Error (streamGetChatCompletion setup): ${e.message}`,
         e
       );
-      if (
-        e.name === "ValidationException" &&
-        e.message.includes("maximum tokens")
-      ) {
-        throw new Error(
-          `AWSBedrock::streamGetChatCompletion failed during setup. Model ${this.model} rejected maxTokens value of ${maxTokensToSend}. Check model documentation for its maximum output token limit and set AWS_BEDROCK_LLM_MAX_OUTPUT_TOKENS if needed. Original error: ${e.message}`
-        );
-      }
-
-      throw new Error(
-        `AWSBedrock::streamGetChatCompletion failed during setup. ${e.message}`
-      );
+      AWSBedrockLLM.errorToHumanReadable(e, {
+        model: this.model,
+        maxTokens: maxTokensToSend,
+        method: "streamGetChatCompletion",
+      });
     }
   }
 
@@ -744,6 +721,34 @@ class AWSBedrockLLM {
     const { messageArrayCompressor } = require("../../helpers/chat");
     const messageArray = this.constructPrompt(promptArgs);
     return await messageArrayCompressor(this, messageArray, rawHistory);
+  }
+
+  static errorToHumanReadable(
+    error,
+    options = { method: "chat", model: "unknown", maxTokens: "unknown" }
+  ) {
+    if (
+      error.name === "ValidationException" &&
+      error.message.includes("maximum tokens")
+    ) {
+      throw new Error(
+        `AWSBedrock::${options.method} failed during setup. Model ${options.model} rejected maxTokens value of ${options.maxTokens}. Check model documentation for its maximum output token limit and set AWS_BEDROCK_LLM_MAX_OUTPUT_TOKENS if needed. Original error: ${error.message}`
+      );
+    }
+
+    if (
+      error.name === "CredentialsProviderError" &&
+      error.message.includes("Could not load credentials from any providers")
+    ) {
+      throw new Error(
+        `AWSBedrock::${options.method} authentication failed. AWS Bedrock requires a discoverable IAM credentials to be available in the environment (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY) or by resolving credentials from ~/.aws/credentials or ~/.aws/config files. Original error: ${error.message}`
+      );
+    }
+
+    // Generic error
+    throw new Error(
+      `AWSBedrock::${options.method} failed during setup. ${error.message}`
+    );
   }
 }
 
