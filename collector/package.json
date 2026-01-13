@@ -45,7 +45,7 @@
     "wavefile": "^11.0.0",
     "winston": "^3.13.0",
     "youtube-transcript-plus": "^1.1.2",
-    "youtubei.js": "^9.1.0"
+    "youtubei.js": "^16.0.1"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
