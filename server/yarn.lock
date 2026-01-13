@@ -1245,10 +1245,10 @@
   resolved "https://registry.yarnpkg.com/@js-sdsl/ordered-map/-/ordered-map-4.4.2.tgz#9299f82874bab9e4c7f9c48d865becbfe8d6907c"
   integrity sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==
 
-"@ladjs/graceful@^3.2.2":
-  version "3.2.2"
-  resolved "https://registry.yarnpkg.com/@ladjs/graceful/-/graceful-3.2.2.tgz#1b141a9dc2604df99177d6714dbe4a0bff5e2ddf"
-  integrity sha512-GyL5Cpgh2RlndFW2e4AUHrEDe0tzyXKpAs92wrAQhNKcY0y++qfK8PC+6TOHzN9zvxPY9j1KAU29Gfa9vxWzDg==
+"@ladjs/graceful@^5.0.0":
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/@ladjs/graceful/-/graceful-5.0.0.tgz#252700549dc5dd0a7700ae6278867accbf59c782"
+  integrity sha512-xTyMjAK8XB+EGgGCB0XiD+5w9F/cIgJMsAFs7p9UJMSsHkUfx2LUfy3/kXWUahjaTetB325rRH5DW49p59IiTg==
   dependencies:
     lil-http-terminator "^1.2.2"
     p-is-promise "3"
