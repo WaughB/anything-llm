@@ -48,7 +48,7 @@
     "youtubei.js": "^9.1.0"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "nodemon": "^2.0.22",
     "prettier": "^2.4.1"
   },
